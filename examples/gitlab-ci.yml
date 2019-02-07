@@ -1,0 +1,69 @@
+stages:
+  - build
+  - deploy
+
+before_script:
+  - TAGGER_ROOT=${VAR_TAGGER_ROOT:-/opt/tagger}
+  - TAG=${CI_COMMIT_REF_SLUG}
+  - PROJECT=${VAR_PROJECT_NAME:-$CI_PROJECT_NAME}
+  - ENV_ROOT=${VAR_ENV_ROOT:-/opt/env}
+  - PROJECT_ENV_PATH=${ENV_ROOT}/${PROJECT}/${TAG}
+  - CONTAINER_ENV_PATH=${VAR_CONTAINER_ENV_PATH:-/app/storage/env}
+  - CONSUL_TEMPLATE_ETC=${VAR_CONSUL_TEMPLATE_ETC:-/opt/etc/consul-template}
+  - ROOT_DOMAIN=${VAR_ROOT_DOMAIN}
+  - CERT_NAME=${VAR_CERT_NAME:-default}
+  - DB_SOURCE_TAG=${VAR_DB_SOURCE_TAG:-latest}
+  - DB_BACKUP_ROOT=${VAR_DB_BACKUP_ROOT:-/opt/backups/mysql}
+  - mkdir -p ${PROJECT_ENV_PATH}
+
+build image:
+  stage: build
+  script:
+    - sed -i
+      -e "s/{PROJECT}/${PROJECT}/g"
+      -e "s/{TAG}/${TAG}/g"
+      .env.tpl
+    - cp .env.tpl ${PROJECT_ENV_PATH}
+    - ${TAGGER_ROOT}/template/generate.sh
+      -c ${CONSUL_TEMPLATE_ETC}
+      -e ${ENV_ROOT}
+      -p ${PROJECT}
+      -t ${TAG}
+    - composer install
+      --optimize-autoloader
+      --no-dev
+      --no-interaction
+      --no-progress
+      --no-suggest
+    - docker build --force-rm -t ${PROJECT}:${TAG} .
+
+deploy master:
+  stage: deploy
+  script:
+    - ${TAGGER_ROOT}/web/run.sh
+      -d ${PROJECT}.${ROOT_DOMAIN}
+      -e ${PROJECT_ENV_PATH}:${CONTAINER_ENV_PATH}
+      -l "--log-driver gelf --log-opt gelf-address=${GELF_ADDRESS}"
+      -p ${PROJECT}
+      -t ${TAG}
+      -c ${CERT_NAME}
+  only:
+    - master
+
+deploy tags:
+  stage: deploy
+  script:
+    - ${TAGGER_ROOT}/mysql/spawn.sh
+      -b ${DB_BACKUP_ROOT}
+      -p ${PROJECT}
+      -s ${DB_SOURCE_TAG}
+      -t ${TAG}
+    - ${TAGGER_ROOT}/web/run.sh
+      -d ${PROJECT}-${TAG}.${ROOT_DOMAIN}
+      -e ${PROJECT_ENV_PATH}:${CONTAINER_ENV_PATH}
+      -p ${PROJECT}
+      -t ${TAG}
+      -c ${CERT_NAME}
+  only:
+    - tags
+
