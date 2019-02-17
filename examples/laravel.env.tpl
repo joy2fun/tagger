@@ -1,4 +1,7 @@
-{{ keyOrDefault "service/{PROJECT}/{TAG}/env" ""}}
+# don't edit this file directly
+# update consul key "env/{PROJECT}/{TAG}" instead
+
+{{ keyOrDefault "env/{PROJECT}/{TAG}" ""}}
 
 APP_NAME=
 APP_ENV=local
@@ -13,5 +16,5 @@ DB_PORT={{ .Port }}
 
 DB_DATABASE=
 DB_USERNAME=root
-DB_PASSWORD=$MYSQL_ROOT_PASSWORD
+DB_PASSWORD=${MYSQL_ROOT_PASSWORD}
 

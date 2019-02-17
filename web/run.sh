@@ -88,11 +88,6 @@ RUNNING_CONTAINER_ID=$(docker ps \
   -f "label=SERVICE_TAGS=${TAG}" \
   --format="{{.ID}}")
 
-if [ "" != "$RUNNING_CONTAINER_ID" ]; then
-  echo "Removing running container: ${RUNNING_CONTAINER_ID} ..."
-  docker container rm -f ${RUNNING_CONTAINER_ID}
-fi
-
 TIMESTR=$(date +%m%d_%H%M%S)
 
 docker run --restart always -it -d \
@@ -107,4 +102,9 @@ docker run --restart always -it -d \
   --network ${NETWORK} \
   ${APPEND_ARGS} \
   ${IMAGE}
+
+if [ "" != "$RUNNING_CONTAINER_ID" ]; then
+  echo "Removing running container: ${RUNNING_CONTAINER_ID} ..."
+  docker container rm -f ${RUNNING_CONTAINER_ID}
+fi
 

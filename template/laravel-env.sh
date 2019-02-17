@@ -1,6 +1,6 @@
 #!/bin/bash
 
-while getopts "c:e:hp:t:" opt; do
+while getopts "c:e:hp:s:t:" opt; do
   case $opt in
     c)
       CONSUL_TEMPLATE_CONFIG_DIR=${OPTARG}
@@ -11,6 +11,9 @@ while getopts "c:e:hp:t:" opt; do
     p)
       PROJECT=${OPTARG}
       ;;
+    s)
+      SOURCE_TEMPLATE=${OPTARG}
+      ;;
     t)
       TAG=${OPTARG}
       ;;
@@ -19,6 +22,7 @@ while getopts "c:e:hp:t:" opt; do
       echo "  -c consule template base dir"
       echo "  -e env files base dir"
       echo "  -p project"
+      echo "  -s source env template"
       echo "  -t tag"
       exit 0
       ;;
@@ -54,9 +58,15 @@ fi
 
 mkdir -p ${ENV_BASE_DIR}/${PROJECT}/${TAG}
 
+sudo chown -R gitlab-runner:wheel ${ENV_BASE_DIR}/${PROJECT}
+
 CONSUL_TEMPLATE_CONFIG_FILE=${CONSUL_TEMPLATE_CONFIG_DIR}/${PROJECT}_${TAG}.hcl
 SOURCE=${ENV_BASE_DIR}/${PROJECT}/${TAG}/.env.tpl
 DESTINATION=${ENV_BASE_DIR}/${PROJECT}/${TAG}/.env
+
+if [ -f "${SOURCE_TEMPLATE}" ]; then
+  cp -f ${SOURCE_TEMPLATE} ${SOURCE}
+fi
 
 tee $CONSUL_TEMPLATE_CONFIG_FILE > /dev/null <<EOF
 template {
@@ -69,4 +79,6 @@ template {
   }
 }
 EOF
+
+sudo systemctl reload cts.service
 

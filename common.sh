@@ -1,4 +1,5 @@
 
+# $1 ancestor image
 select_container() {
   local IMAGE=$1
   echo "======= containers running based on ${IMAGE} ========";
@@ -9,11 +10,14 @@ select_container() {
 }
 
 # check if container is running
+# $1 container id
+# $2 custom additional message
 check_container() {
   local con=$(docker ps --filter id=$1 --format='{{.ID}}\t{{.Names}}')
 
   if [ "" = "$con" ]; then
     echo "Error: container not found."
+    echo $2
     exit 1
   fi
 }
@@ -36,6 +40,7 @@ get_unused_port() {
   '
 }
 
+# find proxy network by ancestor image
 default_network() {
   local id=$(docker ps --filter ancestor=jwilder/nginx-proxy --format='{{.ID}}')
   if [ "$id" = "" ]; then

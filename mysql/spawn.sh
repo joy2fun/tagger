@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CUSTOM_OPTIONS="b:hn:o:p:s:t:"
+CUSTOM_OPTIONS="b:f:hn:o:p:s:t:"
 
 source "$(dirname "$BASH_SOURCE")"/common.sh
 
@@ -8,6 +8,9 @@ while getopts "$CUSTOM_OPTIONS" opt; do
   case $opt in
     b)
       BACKUP_ROOT=${OPTARG}
+      ;;
+    f)
+      FROM_CONTAINER_ID=${OPTARG}
       ;;
     n)
       NETWORK=${OPTARG}
@@ -24,6 +27,7 @@ while getopts "$CUSTOM_OPTIONS" opt; do
     h)
       echo "Usage:"
       echo "  -b backup dir for dumping"
+      echo "  -f from container id. query based on source tag if not present"
       echo "  -n network"
       echo "  -p project"
       echo "  -s source tag"
@@ -41,8 +45,8 @@ if [ -z $BACKUP_ROOT ]; then
   echo "ERROR: missing -b BACKUP_ROOT"
   exit 1
 fi
-if [ -z $SOURCE_TAG ]; then
-  echo "ERROR: missing -s SOURCE_TAG"
+if [ -z $SOURCE_TAG ] && [ -z $FROM_CONTAINER_ID ]; then
+  echo "ERROR: missing -s SOURCE_TAG or -f FROM_CONTAINER_ID"
   exit 1
 fi
 if [ -z $TAG ]; then
@@ -54,15 +58,18 @@ mkdir -p ${BACKUP_ROOT}/${PROJECT}/${TAG}
 
 OUTPUT=${BACKUP_ROOT}/${PROJECT}/${TAG}/db.sql
 
-FROM_CONTAINER_ID=$(docker ps \
-  -f "label=SERVICE_NAME=mysql_${PROJECT}" \
-  -f "label=SERVICE_TAGS=${SOURCE_TAG}" \
-  --format="{{.ID}}")
+if [ -z $FROM_CONTAINER_ID ]; then
+  FROM_CONTAINER_ID=$(docker ps \
+    -f "label=SERVICE_NAME=mysql_${PROJECT}" \
+    -f "label=SERVICE_TAGS=${SOURCE_TAG}" \
+    --format="{{.ID}}")
+fi
 
-check_container ${FROM_CONTAINER_ID}
+check_container ${FROM_CONTAINER_ID} "source container [${FROM_CONTAINER_ID}] does not exist"
 
 echo "dumping all databases ..."
-docker exec -it ${FROM_CONTAINER_ID} \
+test -t 1 && USE_TTY="-t"
+docker exec ${USE_TTY} ${FROM_CONTAINER_ID} \
   sh -c 'exec mysqldump --single-transaction -A ' > $OUTPUT
 
 # check before creating
