@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CUSTOM_OPTIONS="hi:n:p:t:v:"
+CUSTOM_OPTIONS="hi:n:Pp:t:v:"
 
 source "$(dirname "$BASH_SOURCE")"/common.sh
 
@@ -15,6 +15,9 @@ while getopts "$CUSTOM_OPTIONS" opt; do
     p)
       PROJECT=${OPTARG}
       ;;
+    P)
+      PUBLISH_PORT=${OPTARG}
+      ;;
     t)
       TAG=${OPTARG}
       ;;
@@ -26,8 +29,9 @@ while getopts "$CUSTOM_OPTIONS" opt; do
       echo "  -i image"
       echo "  -n network"
       echo "  -p project"
+      echo "  -P publish port"
       echo "  -t tag"
-      echo "  -v init volume"
+      echo "  -v init dir as volume"
       exit 0
       ;;
   esac
@@ -69,16 +73,21 @@ if [ "" != "$CONTAINER_ROW" ]; then
   docker container rm -f ${FOUND_CONTAINER_ID}
 fi
 
-PORT=$(get_unused_port)
+if [ -z $PUBLISH_PORT ]; then
+  PUBLISH_PORT_ARGS=
+else
+  PORT=$(get_unused_port)
+  PUBLISH_PORT_ARGS="-p ${PORT}:3306"
+fi
 
-docker run --restart always -it -d \
+docker run --restart always -it \
   -e MYSQL_ALLOW_EMPTY_PASSWORD=true \
   -l SERVICE_NAME=mysql_${PROJECT} \
   -l SERVICE_TAGS=${TAG} \
   -v mysql_${PROJECT}_${TAG}:/var/lib/mysql \
-  ${INIT_DIR_ARGS} \
-  --name mysql_${PROJECT}_${TAG}_${PORT} \
+  --name mysql_${PROJECT}_${TAG}_$(date '+%H%M%S') \
   --network ${NETWORK} \
-  -p ${PORT}:3306 \
+  ${INIT_DIR_ARGS} \
+  ${PUBLISH_PORT_ARGS} \
   ${DEFAULT_IMAGE}
 
